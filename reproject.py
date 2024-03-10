@@ -77,11 +77,6 @@ def reproject_playing_card(img):
     # Sort the contours by the largest area (hoping the card is one of the larger features)
     contours = sorted(contours, key=cv.contourArea, reverse=True)[:4]
 
-    cv.drawContours(img, contours, 0, (0,255,0), 3)
-    cv.imshow("a", img)
-    while cv.waitKey(0) != 27:
-        pass
-
     corners = None
     # Loop through the contours and try to turn them into boxes
     for c in contours:
