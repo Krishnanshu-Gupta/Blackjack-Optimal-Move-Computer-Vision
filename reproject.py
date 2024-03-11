@@ -1,5 +1,8 @@
 import cv2 as cv
 import numpy as np
+import matplotlib.pyplot as plt
+
+from segment import segment_cards
 
 # https://github.com/PyImageSearch/imutils/blob/9f740a53bcc2ed7eba2558afed8b4c17fd8a1d4c/imutils/perspective.py#L9
 def order_points(pts):
@@ -45,39 +48,20 @@ def create_dest_points(width, height):
     return  np.array([[0, 0], [width, 0], [width, height], [0, height]], dtype=int)
 
 def reproject_playing_card(img):
-    # Perform closing operatiosn to remove high freqency features (e.g. text)
-    kernel = np.ones((5, 5))
-    # closed = cv.morphologyEx(img, cv.MORPH_CLOSE, kernel, iterations=3)
+    segmented = segment_cards(img)
+    gray = cv.cvtColor(segmented, cv.COLOR_RGB2GRAY)
 
-    # GrabCut
-    '''
-    mask = np.zeros(img.shape[:2], np.uint8)
-    bgdModel = np.zeros((1, 65), np.float64)
-    fgdModel = np.zeros((1, 65), np.float64)
-    rect = (20, 20, img.shape[1] - 20, img.shape[0] - 20)
-    cv.grabCut(img, mask, rect, bgdModel, fgdModel, 5, cv.GC_INIT_WITH_RECT)
-    mask2 = np.where((mask == 1) | (mask == 3), 255, 0).astype('uint8')
-    '''
-
-    gray = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
-    blur = cv.GaussianBlur(gray, (5,5),0)
-    _, thresh = cv.threshold(blur,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU)
-
-    # Perform additional closing operations on the thresholded image to remove noise
-    kernel = np.ones((5, 5))
-    opened = cv.morphologyEx(thresh, cv.MORPH_OPEN, kernel);
-    closed = cv.morphologyEx(opened, cv.MORPH_CLOSE, kernel, iterations=15)
-
-    # Perform canny edge detection (could help remove the background, probably unnecessary)
-    #canny = cv.Canny(morph, 0, 200)
+    kernel = np.ones((3, 3), np.uint8)
+    closed = cv.morphologyEx(gray, cv.MORPH_CLOSE, kernel);
+    opened = cv.morphologyEx(closed, cv.MORPH_OPEN, kernel);
 
     # Find countours in the image
-    contours, _ = cv.findContours(closed, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv.findContours(opened, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
 
     # Sort the contours by the largest area (hoping the card is one of the larger features)
-    contours = sorted(contours, key=cv.contourArea, reverse=True)[:4]
+    #contours = sorted(contours, key=cv.contourArea, reverse=True)
 
-    corners = None
+    cards = []
     # Loop through the contours and try to turn them into boxes
     for c in contours:
         # Approximate contours to remove extra points
@@ -85,33 +69,41 @@ def reproject_playing_card(img):
         contour = cv.approxPolyDP(c, epsilon, True)
         # Probably a playing card if it has 4 corners
         if len(contour) == 4:
-            corners = contour
-            break
-    if corners is None:
+            cards.append(contour)
+    if not cards:
         raise ValueError("Given image doesn't have any rectangular contours!")
 
-    corners = order_points(corners.reshape((4, 2)))
-    width, height = get_width_height(corners)
-    # If card is landscape flip the width and height and rotate the dest points
-    if width > height:
-        width, height = height, width
-        destination_corners = create_dest_points(width, height)
-        destination_corners = np.roll(destination_corners, 1, axis=0)
-    else:
-        destination_corners = create_dest_points(width, height)
+    areas = np.array([cv.contourArea(contour) for contour in cards])
+    valid_areas = areas > areas.max() * 0.1
+    cards = [contour for contour, valid in zip(cards, valid_areas) if valid]
 
-    # Getting the homography
-    M = cv.getPerspectiveTransform(np.float32(corners), np.float32(destination_corners))
-    # Perspective transform using homography
-    return cv.warpPerspective(img, M, (width, height), flags=cv.INTER_LINEAR)
+    norm_cards = []
+    for card in cards:
+        card = order_points(card.reshape((4, 2)))
+        width, height = get_width_height(card)
+            # If card is landscape flip the width and height and rotate the dest points
+        if width > height:
+            width, height = height, width
+            destination_corners = create_dest_points(width, height)
+            destination_corners = np.roll(destination_corners, 1, axis=0)
+        else:
+            destination_corners = create_dest_points(width, height)
+
+        # Getting the homography
+        M = cv.getPerspectiveTransform(np.float32(card), np.float32(destination_corners))
+        # Perspective transform using homography
+        norm_card = cv.warpPerspective(img, M, (width, height), flags=cv.INTER_CUBIC)
+        norm_cards.append(norm_card)
+    return norm_cards
 
 
 if __name__ == "__main__":
     import sys
     img = cv.imread(sys.argv[1])
-    reprojected = reproject_playing_card(img)
-    resized = cv.resize(reprojected, (600, 840), interpolation=cv.INTER_CUBIC)
-    cv.imshow("closed", resized)
-    while cv.waitKey(0) != 27:
-        pass
-    cv.destroyAllWindows()
+    reprojecteds = reproject_playing_card(img)
+    for reprojected in reprojecteds:
+        resized = cv.resize(reprojected, (600, 840), interpolation=cv.INTER_CUBIC)
+        cv.imshow("closed", resized)
+        while cv.waitKey(0) != 27:
+            pass
+        cv.destroyAllWindows()
