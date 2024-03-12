@@ -27,7 +27,8 @@ def segment_cards(img, K = 3):
     return img * (labels_mask == np.argmax(scores))[:, :, np.newaxis]
 
 if __name__ == "__main__":
-    img = cv.imread("top-down.jpg")
+    import sys
+    img = cv.imread(sys.argv[1])
     cards = segment_cards(img)
     cv.imshow("a", cards)
     while cv.waitKey(0) != 27:
