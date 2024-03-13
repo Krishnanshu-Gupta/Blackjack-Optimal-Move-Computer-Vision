@@ -81,7 +81,7 @@ def reproject_playing_card(img):
     for card in cards:
         card = order_points(card.reshape((4, 2)))
         width, height = get_width_height(card)
-            # If card is landscape flip the width and height and rotate the dest points
+        # If card is landscape flip the width and height and rotate the dest points
         if width > height:
             width, height = height, width
             destination_corners = create_dest_points(width, height)
@@ -93,7 +93,7 @@ def reproject_playing_card(img):
         M = cv.getPerspectiveTransform(np.float32(card), np.float32(destination_corners))
         # Perspective transform using homography
         norm_card = cv.warpPerspective(img, M, (width, height), flags=cv.INTER_CUBIC)
-        norm_cards.append(norm_card)
+        norm_cards.append((card, norm_card))
     return norm_cards
 
 
@@ -101,9 +101,9 @@ if __name__ == "__main__":
     import sys
     img = cv.imread(sys.argv[1])
     reprojecteds = reproject_playing_card(img)
-    for reprojected in reprojecteds:
-        resized = cv.resize(reprojected, (600, 840), interpolation=cv.INTER_CUBIC)
-        cv.imshow("closed", resized)
+    for rect, reprojected in reprojecteds:
+        #resized = cv.resize(reprojected, (600, 840), interpolation=cv.INTER_CUBIC)
+        cv.imshow("closed", reprojected)
         while cv.waitKey(0) != 27:
             pass
         cv.destroyAllWindows()

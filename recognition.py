@@ -2,11 +2,25 @@ from pathlib import Path
 
 import cv2 as cv
 import numpy as np
+import matplotlib.pyplot as plt
 
 from reproject import reproject_playing_card
 from extract_corners import extract_corner
 
 TRAIN_DIR = Path("train/values")
+
+# Initialize HOG descriptor
+winSize = (28, 28)
+blockSize = (14, 14)
+blockStride = (7, 7)
+cellSize = (7, 7)
+nbins = 9
+hog = cv.HOGDescriptor(winSize, blockSize, blockStride, cellSize, nbins)
+
+def extract_hog_features(image):
+    # Compute HOG descriptor
+    hist = hog.compute(image)
+    return hist.flatten()
 
 def train():
     unique_labels = set()
@@ -17,7 +31,7 @@ def train():
         _, label = label_path.stem.split('-', maxsplit=1)
         for image_path in label_path.iterdir():
             image = cv.imread(str(image_path), cv.IMREAD_GRAYSCALE)
-            image = np.float32(image.flatten()) / 255.0
+            image = extract_hog_features(image)
             images.append(image)
             labels.append(label)
             unique_labels.add(label)
@@ -40,11 +54,16 @@ if __name__ == "__main__":
     cards = reproject_playing_card(cards_img)
 
     knn, labels = train()
-    for card in cards:
+    for rect, card in cards:
         try:
             corner = extract_corner(card)
-            corner = np.float32(corner.flatten()) / 255.0
+            corner = extract_hog_features(corner)
             prediction = predict(knn, labels, corner)
-            print(prediction)
+            thickness = round(0.004 * cards_img.shape[0])
+            cv.polylines(cards_img, [rect.astype(np.int32)], True, (0, 255, 0), thickness)
+            cv.putText(cards_img, prediction, rect.mean(axis=0).astype(np.int32), cv.FONT_HERSHEY_SIMPLEX, 0.002 * cards_img.shape[0], (0, 255, 0), thickness, cv.LINE_AA)
         except RuntimeError as e: 
             print(e)
+
+    plt.imshow(cv.cvtColor(cards_img, cv.COLOR_BGR2RGB))
+    plt.show()
