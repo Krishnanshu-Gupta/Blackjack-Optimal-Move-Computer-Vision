@@ -1,39 +1,50 @@
 from pathlib import Path
-import sys
-import glob
+
 import cv2 as cv
 import numpy as np
-import matplotlib.pyplot as plt
 
 from reproject import reproject_playing_card
+from extract_corners import extract_corner
 
-def load_templates(template_dir: Path):
-    paths = glob.glob(str(template_dir / '*-template.*'))
-    templates = {}
-    for path in paths:
-        path = Path(path)
-        template = cv.imread(str(path), cv.IMREAD_GRAYSCALE)
-        target = path.stem.split("-", maxsplit=1)[0]
-        templates[target] = template
-    return templates
+TRAIN_DIR = Path("train/values")
 
-def get_ccoeff(source, template):
-    res = cv.matchTemplate(source, template, cv.TM_CCOEFF)
-    min_val, max_val, min_loc, max_loc = cv.minMaxLoc(res)
-    return max_val
+def train():
+    unique_labels = set()
 
-templates = load_templates(Path("templates"))
+    images = []
+    labels = []
+    for label_path in TRAIN_DIR.iterdir():
+        _, label = label_path.stem.split('-', maxsplit=1)
+        for image_path in label_path.iterdir():
+            image = cv.imread(str(image_path), cv.IMREAD_GRAYSCALE)
+            image = np.float32(image.flatten()) / 255.0
+            images.append(image)
+            labels.append(label)
+            unique_labels.add(label)
 
-img = cv.imread(sys.argv[1])
-card = reproject_playing_card(img)
+    unique_labels = sorted(list(unique_labels))
+    labels = [unique_labels.index(label) for label in labels]
 
-resized = cv.resize(card, (600, 840), interpolation=cv.INTER_CUBIC)
-gray = cv.cvtColor(resized, cv.COLOR_RGB2GRAY)
+    knn = cv.ml.KNearest_create()
+    knn.train(np.array(images), cv.ml.ROW_SAMPLE, np.array(labels))
+    return knn, unique_labels
 
-ccoeffs = [get_ccoeff(gray, template) for template in templates.values()]
+def predict(knn, labels, image):
+    ret, results, neighbours, dist = knn.findNearest(np.array([image]), 3)
 
-best_target = list(templates)[np.argmax(ccoeffs)]
+    return labels[int(results[0][0])]
 
-print(f"Probably: {best_target}")
-#plt.imshow(gray, cmap='gray')
-#plt.show()
+if __name__ == "__main__":
+    import sys
+    cards_img = cv.imread(sys.argv[1])
+    cards = reproject_playing_card(cards_img)
+
+    knn, labels = train()
+    for card in cards:
+        try:
+            corner = extract_corner(card)
+            corner = np.float32(corner.flatten()) / 255.0
+            prediction = predict(knn, labels, corner)
+            print(prediction)
+        except RuntimeError as e: 
+            print(e)
