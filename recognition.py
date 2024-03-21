@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import cv2 as cv
@@ -48,23 +49,67 @@ def predict(knn, labels, image):
 
     return labels[int(results[0][0])]
 
+def calculate_distance(card1, card2):
+    x1, y1 = card1
+    x2, y2 = card2
+    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+
 if __name__ == "__main__":
     import sys
     cards_img = cv.imread(sys.argv[1])
     cards = reproject_playing_card(cards_img)
-
+    lst = []
     knn, labels = train()
     for rect, card in cards:
         try:
             corner = extract_corner(card)
             corner = extract_hog_features(corner)
             prediction = predict(knn, labels, corner)
+            mid = (np.mean(rect[:, 0]), np.mean(rect[:, 1]))
+            lst.append([mid, prediction])
+
             thickness = round(0.004 * cards_img.shape[0])
             cv.polylines(cards_img, [rect.astype(np.int32)], True, (0, 255, 0), thickness)
             cv.putText(cards_img, prediction, rect.mean(axis=0).astype(np.int32), cv.FONT_HERSHEY_SIMPLEX, 0.002 * cards_img.shape[0], (0, 255, 0), thickness, cv.LINE_AA)
-        except RuntimeError as e: 
+
+        except RuntimeError as e:
             print(e)
 
-    #cv.imwrite(f"{sys.argv[1]}-recon.jpg", cards_img)
+    distances = []
+    back_card = None
+
+    # find dealer's back card (card that is flipped over)
+    for card in lst:
+        if "BACK" in card[1].upper():
+            back_card = card[0]
+            lst.remove(card)
+            break
+
+    if back_card is None:
+        raise ValueError("No card with 'Back' label found.")
+
+    # find the closest card to the back card
+    min_distance = float('inf')
+    closest_card = None
+    for card in lst:
+        distance = calculate_distance(back_card, card[0])
+        if distance < min_distance:
+            min_distance = distance
+            closest_card = card
+    lst.remove(closest_card)
+
+    # get player and dealer hands
+    player_hand = []
+    dealer_hand = []
+    dealer_hand.append(closest_card[1])
+    for card in lst:
+        if card[1] in ("J", "Q", "K"):
+            player_hand.append("10")
+        else: player_hand.append(card[1])
+
+    print(dealer_hand)
+    print(player_hand)
+
+
     plt.imshow(cv.cvtColor(cards_img, cv.COLOR_BGR2RGB))
     plt.show()
