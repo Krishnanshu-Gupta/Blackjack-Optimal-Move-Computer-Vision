@@ -65,5 +65,6 @@ if __name__ == "__main__":
         except RuntimeError as e: 
             print(e)
 
+    #cv.imwrite(f"{sys.argv[1]}-recon.jpg", cards_img)
     plt.imshow(cv.cvtColor(cards_img, cv.COLOR_BGR2RGB))
     plt.show()
