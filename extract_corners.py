@@ -15,6 +15,10 @@ def extract_corner(card):
     # get top left corner of each card
     # just hardcoded, could use contour detection to find biggest thing in a corner
     corner = card[int(0.03 * h):int(0.15 * h), int(0.01 * w):int(0.13 * w)]
+    ch, cw, _ = corner.shape
+    if ch == 0 or cw == 0:
+        raise RuntimeError(f"image too small!")
+
     corner = cv.cvtColor(corner, cv.COLOR_RGB2GRAY)
     corner = cv.inRange(corner, 0, 125)
     corner = cv.resize(corner, (28, 28), interpolation=cv.INTER_CUBIC)
