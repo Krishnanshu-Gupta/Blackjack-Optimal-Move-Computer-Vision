@@ -1,6 +1,5 @@
 import cv2 as cv
 import numpy as np
-import matplotlib.pyplot as plt
 
 def segment_cards(img, K = 3):
     # Define criteria = ( type, max_iter = 10 , epsilon = 1.0 )
@@ -27,14 +26,17 @@ def segment_cards(img, K = 3):
         #cv.drawContours(img, contours, -1, (0,255,0), 3)
 
     labels_mask = labels.reshape(img.shape[:2])
-    return img * (labels_mask == np.argmax(scores))[:, :, np.newaxis]
+    return img * (labels_mask == np.argmax(scores))[:, :, np.newaxis], labels_mask
 
 if __name__ == "__main__":
     import sys
+    import matplotlib.pyplot as plt
+    from skimage import color
+
     img = cv.imread(sys.argv[1])
-    cards = segment_cards(img)
-    plt.imshow(img)
+    cards, labels = segment_cards(img)
+
+    img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+    plt.imshow(color.label2rgb(labels, img))
+    plt.savefig("segment.png")
     plt.show()
-    cv.imshow("a", cards)
-    while cv.waitKey(0) != 27:
-        pass
