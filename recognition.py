@@ -4,6 +4,7 @@ from pathlib import Path
 import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
+from basic_strategy import BasicStrategy
 
 from reproject import reproject_playing_card
 from extract_corners import extract_corner
@@ -112,9 +113,10 @@ if __name__ == "__main__":
             player_hand.append("10")
         else: player_hand.append(card[1])
 
-    print(dealer_hand)
-    print(player_hand)
-
+    strategy = BasicStrategy(player_hand, dealer_hand)
+    move = strategy.recommend()
+    print("Player Hand:", player_hand, "| Dealer Upcard:", dealer_hand)
+    print("Recommended Move:", move)
 
     plt.imshow(cv.cvtColor(cards_img, cv.COLOR_BGR2RGB))
     plt.show()
