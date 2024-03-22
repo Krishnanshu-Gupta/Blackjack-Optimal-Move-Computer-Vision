@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 from segment import segment_cards
 
+
 # https://github.com/PyImageSearch/imutils/blob/9f740a53bcc2ed7eba2558afed8b4c17fd8a1d4c/imutils/perspective.py#L9
 def order_points(pts):
     # sort the points based on their x-coordinates
@@ -25,7 +26,7 @@ def order_points(pts):
     # top-left and right-most points; by the Pythagorean
     # theorem, the point with the largest distance will be
     # our bottom-right point
-    
+
     D = np.linalg.norm(tl - rightMost, axis=1)
     (br, tr) = rightMost[np.argsort(D)[::-1], :]
 
@@ -33,33 +34,42 @@ def order_points(pts):
     # bottom-right, and bottom-left order
     return np.array([tl, tr, br, bl], dtype="float32")
 
+
 def get_width_height(pts):
     (tl, tr, br, bl) = pts
 
     # Finding the maximum width
     maxWidth = int(max(np.linalg.norm(br - bl), np.linalg.norm(tr - tl)))
- 
+
     # Finding the maximum height.
     maxHeight = int(max(np.linalg.norm(tr - br), np.linalg.norm(tl - bl)))
     return maxWidth, maxHeight
 
+
 def create_dest_points(width, height):
     # Final destination co-ordinates
-    return  np.array([[0, 0], [width, 0], [width, height], [0, height]], dtype=int)
+    return np.array([[0, 0], [width, 0], [width, height], [0, height]], dtype=int)
+
 
 def reproject_playing_card(img):
-    segmented = segment_cards(img)
+    segmented, _ = segment_cards(img)
     gray = cv.cvtColor(segmented, cv.COLOR_RGB2GRAY)
 
     kernel = np.ones((3, 3), np.uint8)
-    closed = cv.morphologyEx(gray, cv.MORPH_CLOSE, kernel);
-    opened = cv.morphologyEx(closed, cv.MORPH_OPEN, kernel);
+    closed = cv.morphologyEx(gray, cv.MORPH_CLOSE, kernel)
+    opened = cv.morphologyEx(closed, cv.MORPH_OPEN, kernel)
 
     # Find countours in the image
     contours, _ = cv.findContours(opened, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
 
+    opened = cv.cvtColor(opened, cv.COLOR_GRAY2RGB)
+    cv.drawContours(opened, contours, -1, (0, 255, 0), 16)
+    opened = cv.cvtColor(opened, cv.COLOR_BGR2RGB)
+    plt.imshow(opened)
+    plt.show()
+
     # Sort the contours by the largest area (hoping the card is one of the larger features)
-    #contours = sorted(contours, key=cv.contourArea, reverse=True)
+    # contours = sorted(contours, key=cv.contourArea, reverse=True)
 
     cards = []
     # Loop through the contours and try to turn them into boxes
@@ -90,7 +100,9 @@ def reproject_playing_card(img):
             destination_corners = create_dest_points(width, height)
 
         # Getting the homography
-        M = cv.getPerspectiveTransform(np.float32(card), np.float32(destination_corners))
+        M = cv.getPerspectiveTransform(
+            np.float32(card), np.float32(destination_corners)
+        )
         # Perspective transform using homography
         norm_card = cv.warpPerspective(img, M, (width, height), flags=cv.INTER_CUBIC)
         norm_cards.append((card, norm_card))
@@ -99,11 +111,37 @@ def reproject_playing_card(img):
 
 if __name__ == "__main__":
     import sys
+    import math
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.axes_grid1 import ImageGrid
+
     img = cv.imread(sys.argv[1])
     reprojecteds = reproject_playing_card(img)
-    for rect, reprojected in reprojecteds:
-        #resized = cv.resize(reprojected, (600, 840), interpolation=cv.INTER_CUBIC)
-        cv.imshow("closed", reprojected)
-        while cv.waitKey(0) != 27:
-            pass
-        cv.destroyAllWindows()
+    n = int(math.ceil(math.sqrt(len(reprojecteds))))
+
+    for rect, card in reprojecteds:
+        thickness = round(0.004 * img.shape[0])
+        cv.polylines(img, [rect.astype(np.int32)], True, (0, 255, 0), thickness)
+
+    img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+    plt.imshow(img)
+    plt.savefig("rects.png")
+    plt.show()
+
+    fig = plt.figure()
+    grid = ImageGrid(fig, 111, nrows_ncols=(n, n))
+
+    for ax, (rect, im) in zip(grid, reprojecteds):
+        im = cv.cvtColor(im, cv.COLOR_BGR2RGB)
+        im = cv.resize(im, (600, int(600 * 1.4)))
+        ax.imshow(im)
+
+    plt.savefig("reproject.png")
+    plt.show()
+
+    # for rect, reprojected in reprojecteds:
+    #     #resized = cv.resize(reprojected, (600, 840), interpolation=cv.INTER_CUBIC)
+    #     cv.imshow("closed", reprojected)
+    #     while cv.waitKey(0) != 27:
+    #         pass
+    #     cv.destroyAllWindows()
