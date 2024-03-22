@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from reproject import reproject_playing_card
 from extract_corners import extract_corner
 
-TRAIN_DIR = Path("train/values")
+TRAIN_DIR = Path("data/train")
 
 # Initialize HOG descriptor
 winSize = (28, 28)
@@ -23,12 +23,12 @@ def extract_hog_features(image):
     hist = hog.compute(image)
     return hist.flatten()
 
-def train():
+def build_dataset(dir, unique_labels = set()):
     unique_labels = set()
 
     images = []
     labels = []
-    for label_path in TRAIN_DIR.iterdir():
+    for label_path in dir.iterdir():
         _, label = label_path.stem.split('-', maxsplit=1)
         for image_path in label_path.iterdir():
             image = cv.imread(str(image_path), cv.IMREAD_GRAYSCALE)
@@ -39,6 +39,10 @@ def train():
 
     unique_labels = sorted(list(unique_labels))
     labels = [unique_labels.index(label) for label in labels]
+    return images, labels, unique_labels
+
+def train():
+    images, labels, unique_labels = build_dataset(TRAIN_DIR)
 
     knn = cv.ml.KNearest_create()
     knn.train(np.array(images), cv.ml.ROW_SAMPLE, np.array(labels))
@@ -49,6 +53,7 @@ def predict(knn, labels, image):
 
     return labels[int(results[0][0])]
 
+# Just use np.linalg.norm please
 def calculate_distance(card1, card2):
     x1, y1 = card1
     x2, y2 = card2

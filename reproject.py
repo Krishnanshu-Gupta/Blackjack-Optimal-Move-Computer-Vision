@@ -62,15 +62,6 @@ def reproject_playing_card(img):
     # Find countours in the image
     contours, _ = cv.findContours(opened, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
 
-    opened = cv.cvtColor(opened, cv.COLOR_GRAY2RGB)
-    cv.drawContours(opened, contours, -1, (0, 255, 0), 16)
-    opened = cv.cvtColor(opened, cv.COLOR_BGR2RGB)
-    plt.imshow(opened)
-    plt.show()
-
-    # Sort the contours by the largest area (hoping the card is one of the larger features)
-    # contours = sorted(contours, key=cv.contourArea, reverse=True)
-
     cards = []
     # Loop through the contours and try to turn them into boxes
     for c in contours:
@@ -83,10 +74,12 @@ def reproject_playing_card(img):
     if not cards:
         raise ValueError("Given image doesn't have any rectangular contours!")
 
+    # Remove abnormally small contours as outliers
     areas = np.array([cv.contourArea(contour) for contour in cards])
     valid_areas = areas > areas.max() * 0.1
     cards = [contour for contour, valid in zip(cards, valid_areas) if valid]
 
+    # Reproject the cards
     norm_cards = []
     for card in cards:
         card = order_points(card.reshape((4, 2)))

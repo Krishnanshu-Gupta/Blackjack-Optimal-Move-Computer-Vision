@@ -13,18 +13,19 @@ def segment_cards(img, K = 3):
     img_flat = np.float32(img.reshape(w * h, c))
     _, labels, _ = cv.kmeans(img_flat, K, None, criteria, 10, flags)
 
+    # Convert image to HSV
     img_hsv = cv.cvtColor(img, cv.COLOR_RGB2HSV).reshape((w * h, 3))
     scores = []
     for i in range(K):
         labels = labels.reshape(-1)
         mask = labels == i
         masked = img_hsv[mask]
+        # Caculate "score" for each cluster as (1.0 - average saturation) + average luminance
         avg_sat = masked[:, 1].mean()
         avg_val = masked[:, 2].mean()
         scores.append((255.0 - avg_sat) + avg_val)
-        #labels_mask = labels.reshape(img.shape[:2])
-        #cv.drawContours(img, contours, -1, (0,255,0), 3)
 
+    # Convert the shape of the labels to match the image and select the cluster with max score
     labels_mask = labels.reshape(img.shape[:2])
     return img * (labels_mask == np.argmax(scores))[:, :, np.newaxis], labels_mask
 
