@@ -64,6 +64,8 @@ if __name__ == "__main__":
     import sys
     cards_img = cv.imread(sys.argv[1])
     cards = reproject_playing_card(cards_img)
+    height, width, _ = cards_img.shape
+    thickness = round(0.004 * cards_img.shape[0])
     lst = []
     knn, labels = train()
     for rect, card in cards:
@@ -73,8 +75,6 @@ if __name__ == "__main__":
             prediction = predict(knn, labels, corner)
             mid = (np.mean(rect[:, 0]), np.mean(rect[:, 1]))
             lst.append([mid, prediction])
-
-            thickness = round(0.004 * cards_img.shape[0])
             cv.polylines(cards_img, [rect.astype(np.int32)], True, (0, 255, 0), thickness)
             cv.putText(cards_img, prediction, rect.mean(axis=0).astype(np.int32), cv.FONT_HERSHEY_SIMPLEX, 0.002 * cards_img.shape[0], (0, 255, 0), thickness, cv.LINE_AA)
 
@@ -115,8 +115,8 @@ if __name__ == "__main__":
 
     strategy = BasicStrategy(player_hand, dealer_hand)
     move = strategy.recommend()
-    print("Player Hand:", player_hand, "| Dealer Upcard:", dealer_hand)
-    print("Recommended Move:", move)
+    text_size = cv.getTextSize("text", cv.FONT_HERSHEY_SIMPLEX, 0.5, thickness)[0]
+    cv.putText(cards_img, f"Move: {move}", (30, height - 30), cv.FONT_HERSHEY_SIMPLEX, 0.0015 * cards_img.shape[0], (255, 255, 255), thickness, cv.LINE_AA)
 
     plt.imshow(cv.cvtColor(cards_img, cv.COLOR_BGR2RGB))
     plt.show()
