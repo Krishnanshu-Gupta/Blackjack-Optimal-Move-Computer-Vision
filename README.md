@@ -12,4 +12,5 @@ python3 recognition.py {image_path}
 ```
 
 Sample Output for 4 different test images. The recommended move is listed in the bottom left of the images.
-![Uploading Screenshot 2024-04-01 at 9.03.14 PM.png…]()
+![](/output1.png)
+![](/output2.png)
