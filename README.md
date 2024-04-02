@@ -11,6 +11,7 @@ To test this code, simply execute recognition.py and provide the image path as a
 python3 recognition.py {image_path}
 ```
 
-Sample Output for 4 different test images. The recommended move is listed in the bottom left of the images.
+Sample Output for 6 different test images. The recommended move is listed in the bottom left of the images.
+
 ![](/output1.png)
 ![](/output2.png)
